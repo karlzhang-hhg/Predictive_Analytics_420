@@ -112,10 +112,8 @@ CVInd <- function(n,K) {  #n is sample size; K is number of parts; returns K-len
   }
   Ind
 }
-```
 
 ##Now use multiple reps of CV to compare Neural Nets and linear reg models###
-```{r}
 library(nnet)
 CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
   n=nrow(data)
@@ -150,33 +148,29 @@ CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
   ##The optimal lambda and number of hidden nodes
   mod_par[,which(MSEAve==min(MSEAve))]
 }
-```
 
 ##Do a CV in crude interval of lambda and number of hidden nodes.
-```{r}
 ptm <- proc.time()
-Nrep<-2 #number of replicates of CV
+Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
-n.lam = 4 #number of lambda
-n.num_hidnode = 2 #number of different numbers of hidden nodes
+n.lam = 10 #number of lambda
+n.num_hidnode = 5 #number of different numbers of hidden nodes
 y<-df_std$cost #observed responses
 lam_seq = 10^seq(-as.integer(n.lam/2),as.integer(n.lam/2)-1) #seq of penalty parameters
 num_hidnode_seq = 5*seq(1,n.num_hidnode) #seq of number of hidden nodes
 
 par_best_crude <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y)
 proc.time() - ptm
-```
 
 ##Do a CV in smaller interval of lambda and number of hidden nodes again.
-```{r}
 ptm <- proc.time()
-Nrep <- 2 #number of replicates of CV
+Nrep <- 10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
-n.lam = 2 #number of lambda
-n.num_hidnode = 2 #number of different numbers of hidden nodes
+n.lam = 19 #number of lambda
+n.num_hidnode = 5 #number of different numbers of hidden nodes
 y<-df_std$cost #observed responses
-lam_seq = c(seq(4,4),seq(10,10,10))
-num_hidnode_seq = seq(15,17,2)
+lam_seq = c(seq(1,9),seq(10,100,10))
+num_hidnode_seq = seq(12,20,2)
 
 par_best <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y) #Best parameter
 proc.time() - ptm
@@ -319,10 +313,10 @@ CVfunc_nnet_clf <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
 ##Do a CV on crude interval of lambda and number of hidden nodes again.
 library(nnet)
 ptm <- proc.time()
-Nrep<-2 #number of replicates of CV
+Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
-n.lam = 4 #number of lambda
-n.num_hidnode = 2 #number of different numbers of hidden nodes
+n.lam = 10 #number of lambda
+n.num_hidnode = 5 #number of different numbers of hidden nodes
 y<-FGL1$type_ind
 lam_seq = 10^seq(-as.integer(n.lam/2),as.integer(n.lam/2)-1)
 num_hidnode_seq = 5*seq(1,n.num_hidnode) 
@@ -332,13 +326,13 @@ proc.time() - ptm
 
 ##Do a CV in smaller interval of lambda and number of hidden nodes again.
 ptm <- proc.time()
-Nrep<-2 #number of replicates of CV
+Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
-n.lam = 2 #number of lambda
-n.num_hidnode = 2 #number of different numbers of hidden nodes
+n.lam = 19 #number of lambda
+n.num_hidnode = 5 #number of different numbers of hidden nodes
 y<-FGL1$type_ind
-lam_seq = c(seq(0.05,0.05,0.01),seq(0.1,0.1,0.1))
-num_hidnode_seq = seq(24,26,2)  
+lam_seq = c(seq(0.01,0.09,0.01),seq(0.1,1,0.1))
+num_hidnode_seq = seq(22,30,2)  
 
 par_best <- CVfunc_nnet_clf(FGL1[,c(1:10)], lam_seq, num_hidnode_seq,Nrep,K,y)
 proc.time() - ptm
