@@ -2,7 +2,7 @@
 title: "HW2"
 author: "Kungang Zhang"
 date: "February 10, 2017"
-output: word_document
+output: pdf_document
 ---
 #If document rendering becomes time consuming due to long computations or plots that are expensive to generate you can use knitr caching to improve performance. The documentation knitr chunk and package options describe how caching works and the cache examples provide additional details.
 
@@ -96,7 +96,7 @@ title(main="Ischemic heart disease-standardized \n predictors with log(cost)-lm-
 
 #Prob 2)Find the best neural network model for the ischemic heart disease data set, using linear output activation func, and do not rescale the response.
 ##(a)Use 10-fold CV to find the best combination of shrinkage param and the number of hidden nodes.
-##Answer: The neural network with the smallest MSE has $\lambda = $ and number of hidden nodes , and the MSE is . It has $R^2$.
+##Answer: The neural network with the smallest MSE has $ = $ and number of hidden nodes , and the MSE is . It has $R^2$.
 ```{r}
 ##CV index random generator
 CVInd <- function(n,K) {  #n is sample size; K is number of parts; returns K-length list of indices for each part
@@ -279,7 +279,7 @@ FGL1<-data.frame(FGL1,"type_ind"=as.numeric(factor(FGL1$type)))#add a column of 
 ```
 
 ##(a)10-fold CV to find the best nnet for classifying the class type
-##Answer: The neural network with the smallest misclassification rate has $\lambda = $ and number of hidden nodes as . The misclassification rate is .
+##Answer: The neural network with the smallest misclassification rate has $ = $ and number of hidden nodes as . The misclassification rate is .
 ```{r}
 ##CV function for classification
 CVfunc_nnet_clf <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
