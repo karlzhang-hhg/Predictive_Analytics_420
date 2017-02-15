@@ -89,6 +89,9 @@ CVInd <- function(n,K) {  #n is sample size; K is number of parts; returns K-len
 
 ##Now use multiple reps of CV to compare Neural Nets and linear reg models###
 library(nnet)
+require(doParallel) #For simple parallel computing
+registerDoParallel(cores=4)
+getDoParWorkers()
 CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
   n=nrow(data)
   n.models = n.lam*n.num_hidnode #number of different models to fit
@@ -97,7 +100,7 @@ CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
   ##Each column of mod_par corresponds to a set of lambda and number of hidden nodes of a trail model
   mod_par=matrix(c(rep(lam_seq,times=1,each=n.num_hidnode),rep(num_hidnode_seq,times=n.lam,each=1)),2,n.models,byrow = T)#Store the model parameters: lambda and the number of nodes in hidden layer
   MSE<-matrix(0,Nrep,n.models)
-  for (j in 1:Nrep) {
+  MSE <- for (j in 1:Nrep) {
     print(c(0,0,0,j))#Print out the index of replicates of CV
     Ind<-CVInd(n,K)
     for (k in 1:K) {
@@ -338,3 +341,5 @@ e.multi<-sum(FGL1$type!=yhat)/length(yhat)
 # ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(cache=TRUE)
 # ```
+
+require(doParallel)

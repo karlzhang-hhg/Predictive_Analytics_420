@@ -96,7 +96,7 @@ title(main="Ischemic heart disease-standardized \n predictors with log(cost)-lm-
 
 #Prob 2)Find the best neural network model for the ischemic heart disease data set, using linear output activation func, and do not rescale the response.
 ##(a)Use 10-fold CV to find the best combination of shrinkage param and the number of hidden nodes.
-##Answer: The neural network with the smallest MSE has $\lambda = $ and number of hidden nodes , and the MSE is . It has $R^2$.
+##Answer: The neural network with the smallest MSE has $ = $ and number of hidden nodes , and the MSE is . It has $R^2$.
 ```{r}
 ##CV index random generator
 CVInd <- function(n,K) {  #n is sample size; K is number of parts; returns K-length list of indices for each part
@@ -112,10 +112,15 @@ CVInd <- function(n,K) {  #n is sample size; K is number of parts; returns K-len
   }
   Ind
 }
+```
 
 ##Now use multiple reps of CV to compare Neural Nets and linear reg models###
-library(nnet)
-CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
+```{r}
+CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores) {
+  library(nnet)
+  library(foreach)
+  library(doParallel)
+  
   n=nrow(data)
   n.lam = length(lam_seq)
   n.num_hidnode = length(num_hidnode_seq)
@@ -125,57 +130,72 @@ CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
   ##Each column of mod_par corresponds to a set of lambda and number of hidden nodes of a trail model
   mod_par=matrix(c(rep(lam_seq,times=1,each=n.num_hidnode),rep(num_hidnode_seq,times=n.lam,each=1)),2,n.models,byrow = T)#Store the model parameters: lambda and the number of nodes in hidden layer
   MSE<-matrix(0,Nrep,n.models)
-  for (j in 1:Nrep) {
-    print(c(0,0,0,j))#Print out the index of replicates of CV
-    Ind<-CVInd(n,K)
-    for (k in 1:K) {
-      print(k)#Print out the index of different fold of CV
-      for (m in 1:n.models) {
-        out<-nnet(cost~.,data[-Ind[[k]],],linout = T, skip=F,size=as.integer(mod_par[2,m]),decay=mod_par[1,m],maxit=1000,trace=F)
-        yhat[Ind[[k]],m]<-as.numeric(predict(out,data[Ind[[k]],]))
-      }
-    } #end of k loop
-    MSE[j,]=apply(yhat,2,function(x) sum((y-x)^2))/n
-  } #end of j loop
-  MSE
-  MSEAve<- apply(MSE,2,mean); MSEAve #averaged mean square CV error
-  MSEsd <- apply(MSE,2,sd); MSEsd   #SD of mean square CV error
-  r2<-1-MSEAve/var(y); r2  #CV r^2
+  
+  cl <- makeCluster(num_cores,type="FORK")
+  registerDoParallel(cl)
+  MSE <- foreach(j = 1:Nrep,
+                 .combine = rbind) %dopar% {
+                   set.seed(100+j)#Set seed for each new session for a core, otherwise each batch of for loop will have the same random numbers, because "Fork"
+                   print(c(0,0,0,j))#Print out the index of replicates of CV
+                   Ind<-CVInd(n,K)
+                   for (k in 1:K) {
+                     print(k)#Print out the index of different fold of CV
+                     for (m in 1:n.models) {
+                       out<-nnet(cost~.,data[-Ind[[k]],],linout = T, skip=F,size=as.integer(mod_par[2,m]),decay=mod_par[1,m],maxit=1000,trace=F)
+                       yhat[Ind[[k]],m]<-as.numeric(predict(out,data[Ind[[k]],]))
+                     }
+                   } #end of k loop
+                   #MSE[j,]=apply(yhat,2,function(x) sum((y-x)^2))/n
+                   apply(yhat,2,function(x) sum((y-x)^2))/n
+                 }
+  stopCluster(cl)
+  print(MSE)
+  MSEAve<- apply(MSE,2,mean); print(MSEAve) #averaged mean square CV error
+  MSEsd <- apply(MSE,2,sd); print(MSEsd)   #SD of mean square CV error
+  r2<-1-MSEAve/var(y); print(r2)  #CV r^2
   ##The best model in terms of the minimum MSEAve or the maximum r2.
   min(MSEAve)
   max(r2)
   ##Return the index of the minimum MSEAve or the maximum r2.
-  which(MSEAve==min(MSEAve))
-  which(r2==max(r2))
+  print(which(MSEAve==min(MSEAve)))
+  print(which(r2==max(r2)))
   ##The optimal lambda and number of hidden nodes
   mod_par[,which(MSEAve==min(MSEAve))]
 }
+```
 
 ##Do a CV in crude interval of lambda and number of hidden nodes.
-ptm <- proc.time()
+```{r}
 Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
 n.lam = 10 #number of lambda
 n.num_hidnode = 5 #number of different numbers of hidden nodes
 y<-df_std$cost #observed responses
+num_cores<- 5; #number of cores to run parallel
 lam_seq = 10^seq(-as.integer(n.lam/2),as.integer(n.lam/2)-1) #seq of penalty parameters
 num_hidnode_seq = 5*seq(1,n.num_hidnode) #seq of number of hidden nodes
 
-par_best_crude <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y)
+ptm <- proc.time()
+par_best_crude1 <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores)
 proc.time() - ptm
+par_best_crude1
+```
 
 ##Do a CV in smaller interval of lambda and number of hidden nodes again.
-ptm <- proc.time()
+```{r}
 Nrep <- 10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
 n.lam = 19 #number of lambda
-n.num_hidnode = 5 #number of different numbers of hidden nodes
+n.num_hidnode = 10 #number of different numbers of hidden nodes
 y<-df_std$cost #observed responses
-lam_seq = c(seq(1,9),seq(10,100,10))
-num_hidnode_seq = seq(12,20,2)
+num_cores<- 5; #number of cores to run parallel
+lam_seq = c(seq(.1,.9,.1),seq(1,10,1))
+num_hidnode_seq = seq(6,15,1)
 
-par_best <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y) #Best parameter
+ptm <- proc.time()
+par_best <- CVfunc_nnet(df_std, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores) #Best parameter
 proc.time() - ptm
+par_best
 ```
 
 ##(b)Fit the best model and discuss how good the predictive power is.
@@ -227,7 +247,10 @@ df_std.tr <- rpart(cost ~ .,df_std, method = "anova", control = control)
 plotcp(df_std.tr)  #plot of CV r^2 vs. size
 printcp(df_std.tr)  #same info is in df_std.tr$cptable
 #prune back to optimal size, according to plot of CV 1-r^2
-df_std.tr1 <- prune(df_std.tr, cp=0.00991235)  #approximately the best size pruned tree
+cpt<-df_std.tr$cptable
+ind<-which(cpt[,'xerror']==min(cpt[,'xerror']))
+
+df_std.tr1 <- prune(df_std.tr, cp=cpt[ind,'CP'])  #approximately the best size pruned tree
 df_std.tr1$variable.importance#The importance of each predictors
 df_std.tr1$cptable[nrow(df_std.tr1$cptable),] #shows training and CV 1-r^2, and other things
 # #prune and plot a little smaller tree than the optimal one, just for display
@@ -242,7 +265,7 @@ c(1-var(e)/var(df_std$cost), 1-df_std.tr1$cptable[nrow(df_std.tr1$cptable),3]) #
 ##(b)Fit the best model and discuss how good the predictive power of model is.
 ##Answer: The $R^2$ of the best model is .
 ```{r}
-control_best <- rpart.control(minbucket = 5, cp = 0.00991235, maxsurrogate = 0, usesurrogate = 0)
+control_best <- rpart.control(minbucket = 5, cp = cpt[ind,'CP'], maxsurrogate = 0, usesurrogate = 0)
 df_std.tr_best <- rpart(cost ~ .,df_std, method = "anova", control = control)
 summary(df_std.tr_best)
 ```
@@ -275,69 +298,86 @@ FGL1<-data.frame(FGL1,"type_ind"=as.numeric(factor(FGL1$type)))#add a column of 
 ```
 
 ##(a)10-fold CV to find the best nnet for classifying the class type
-##Answer: The neural network with the smallest misclassification rate has $\lambda = $ and number of hidden nodes as . The misclassification rate is .
+##Answer: The neural network with the smallest misclassification rate has $ = $ and number of hidden nodes as . The misclassification rate is .
 ```{r}
 ##CV function for classification
-CVfunc_nnet_clf <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y) {
+CVfunc_nnet_clf <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores) {
+  library(nnet)
+  library(foreach)
+  library(doParallel)
+  
   n=nrow(data)
+  n.lam = length(lam_seq)
+  n.num_hidnode = length(num_hidnode_seq)
   n.models = n.lam*n.num_hidnode #number of different models to fit
   yhat=matrix(0,n,n.models)
   
   ##Each column of mod_par corresponds to a set of lambda and number of hidden nodes of a trail model
   mod_par=matrix(c(rep(lam_seq,times=1,each=n.num_hidnode),rep(num_hidnode_seq,times=n.lam,each=1)),2,n.models,byrow = T)#Store the model parameters: lambda and the number of nodes in hidden layer
-  MSE<-matrix(0,Nrep,n.models)
-  for (j in 1:Nrep) {
-    print(c(0,0,0,j))#Print out the index of replicates of CV
-    Ind<-CVInd(n,K)
-    for (k in 1:K) {
-      print(k)#Print out the index of different fold of CV
-      for (m in 1:n.models) {
-        out<-nnet(type~.,data[-Ind[[k]],],linout = F, skip=F,size=as.integer(mod_par[2,m]),decay=mod_par[1,m],maxit=1000,trace=F)
-        phat<-predict(out,data[Ind[[k]],])
-        yhat[Ind[[k]],m]<-apply(phat,1,function(x) which(x==max(x)))
-      }
-    } #end of k loop
-    MSE[j,]=apply(yhat,2,function(x) sum(y != x)/n)
+  MCR<-matrix(0,Nrep,n.models)
+  
+  cl <- makeCluster(num_cores,type="FORK")
+  registerDoParallel(cl)
+  MCR <- foreach(j = 1:Nrep,
+                 .combine = rbind) %dopar% {
+                   set.seed(100+j)#Set seed for each new session for a core, otherwise each batch of for loop will have the same random numbers, because "Fork"
+                  print(c(0,0,0,j))#Print out the index of replicates of CV
+                  Ind<-CVInd(n,K)
+                  for (k in 1:K) {
+                    print(k)#Print out the index of different fold of CV
+                    for (m in 1:n.models) {
+                      out<-nnet(type~.,data[-Ind[[k]],],linout = F, skip=F,size=as.integer(mod_par[2,m]),decay=mod_par[1,m],maxit=1000,trace=F)
+                      phat<-predict(out,data[Ind[[k]],])
+                      yhat[Ind[[k]],m]<-apply(phat,1,function(x) which(x==max(x)))
+                    }
+                  } #end of k loop
+                  apply(yhat,2,function(x) sum(y != x)/n)
   } #end of j loopE
-  MSEAve<- apply(MSE,2,mean); MSEAve #averaged mean square CV error
-  MSEsd <- apply(MSE,2,sd); MSEsd   #SD of mean square CV error
-  r2<-1-MSEAve/var(y); r2  #CV r^2
+  stopCluster(cl)
+  print(MCR)
+  MCRAve<- apply(MCR,2,mean); print(MCRAve) #averaged mean square CV error
+  MCRsd <- apply(MCR,2,sd); print(MCRsd)   #SD of mean square CV error
+  r2<-1-MCRAve/var(y); print(r2)  #CV r^2
   ##The best model in terms of the minimum MSEAve or the maximum r2.
-  min(MSEAve)
+  min(MCRAve)
   max(r2)
   ##Return the index of the minimum MSEAve or the maximum r2.
-  which(MSEAve==min(MSEAve))
-  which(r2==max(r2))
+  print(which(MCRAve==min(MCRAve)))
+  print(which(r2==max(r2)))
   ##The optimal lambda and number of hidden nodes
-  mod_par[,which(MSEAve==min(MSEAve))]
+  mod_par[,which(MCRAve==min(MCRAve))]
 }
 
 ##Do a CV on crude interval of lambda and number of hidden nodes again.
-library(nnet)
-ptm <- proc.time()
+
 Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
 n.lam = 10 #number of lambda
 n.num_hidnode = 5 #number of different numbers of hidden nodes
+num_cores = 5 #Tried 5, 7, 8 nodes, and found that 5 nodes is the fastest one.
 y<-FGL1$type_ind
 lam_seq = 10^seq(-as.integer(n.lam/2),as.integer(n.lam/2)-1)
 num_hidnode_seq = 5*seq(1,n.num_hidnode) 
 
-par_best_crude <- CVfunc_nnet_clf(FGL1[,c(1:10)], lam_seq, num_hidnode_seq,Nrep,K,y)
+ptm <- proc.time()
+par_best_crude <- CVfunc_nnet_clf(FGL1[,c(1:10)], lam_seq, num_hidnode_seq,Nrep,K,y,num_cores)
 proc.time() - ptm
+par_best_crude
 
 ##Do a CV in smaller interval of lambda and number of hidden nodes again.
-ptm <- proc.time()
 Nrep<-10 #number of replicates of CV
 K<-10  #K-fold CV on each replicate
 n.lam = 19 #number of lambda
-n.num_hidnode = 5 #number of different numbers of hidden nodes
+n.num_hidnode = 10 #number of different numbers of hidden nodes
+num_cores = 5 #Tried 5, 7, 8 cores, and found that 5 cores is the fastest one. For 5 cores, all cores finished at the same time, while for other number of cores, part of cores finished later than others.
 y<-FGL1$type_ind
 lam_seq = c(seq(0.01,0.09,0.01),seq(0.1,1,0.1))
-num_hidnode_seq = seq(22,30,2)  
+num_hidnode_seq = seq(21,30,1)  
 
-par_best <- CVfunc_nnet_clf(FGL1[,c(1:10)], lam_seq, num_hidnode_seq,Nrep,K,y)
+ptm <- proc.time()
+par_best <- CVfunc_nnet_clf(FGL1[,c(1:10)], lam_seq, num_hidnode_seq,Nrep,K,y,num_cores)
 proc.time() - ptm
+par_best
 
 ##Fit the best nnet model
 out<-nnet(type~.,FGL1[,c(1:10)],linout = F, skip=F,size=as.integer(par_best[2]),decay=par_best[1],maxit=1000,trace=F)##type is a factor
