@@ -131,11 +131,11 @@ CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores) {
   mod_par=matrix(c(rep(lam_seq,times=1,each=n.num_hidnode),rep(num_hidnode_seq,times=n.lam,each=1)),2,n.models,byrow = T)#Store the model parameters: lambda and the number of nodes in hidden layer
   MSE<-matrix(0,Nrep,n.models)
   
-  cl <- makeCluster(num_cores,type="FORK")
+  cl <- makeCluster(num_cores,type="FORK") #"Fork" will share all the variables and functions across cores.
   registerDoParallel(cl)
   MSE <- foreach(j = 1:Nrep,
                  .combine = rbind) %dopar% {
-                   set.seed(100+j)#Set seed for each new session for a core, otherwise each batch of for loop will have the same random numbers, because "Fork"
+                   set.seed(100+j)#Set seed for each new session for a core, otherwise each batch of for loop will have the same random numbers, because of "Fork"; the combine is 'rbind' so that the results from each core will be combined row-by-row.
                    print(c(0,0,0,j))#Print out the index of replicates of CV
                    Ind<-CVInd(n,K)
                    for (k in 1:K) {
@@ -148,7 +148,7 @@ CVfunc_nnet <- function(data, lam_seq, num_hidnode_seq,Nrep,K,y,num_cores) {
                    #MSE[j,]=apply(yhat,2,function(x) sum((y-x)^2))/n
                    apply(yhat,2,function(x) sum((y-x)^2))/n
                  }
-  stopCluster(cl)
+  stopCluster(cl) #Return the cores
   print(MSE)
   MSEAve<- apply(MSE,2,mean); print(MSEAve) #averaged mean square CV error
   MSEsd <- apply(MSE,2,sd); print(MSEsd)   #SD of mean square CV error
